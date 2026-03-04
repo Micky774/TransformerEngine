@@ -64,16 +64,25 @@ jobs:
                   per_page: 100,
                 });
 
-                const satisfiesAddedLevel = runs.some(run => {
+                const candidateRuns = runs.filter(run => {
                   const prMatch = (run.pull_requests || []).some(pr => pr.number === prNumber);
                   const sameSha = run.head_sha === headSha;
                   const sameHeadRef = run.head_branch === context.payload.pull_request.head.ref;
                   const activeOrDone = run.status === 'queued' || run.status === 'in_progress' || run.status === 'completed';
-                  const title = run.display_title || run.name || '';
-                  const match = title.match(/CI Level (\d+)/i);
-                  const runLevel = match ? Number(match[1]) : 0;
-                  return (prMatch || sameHeadRef) && sameSha && activeOrDone && runLevel >= addedLevel;
+                  return (prMatch || sameHeadRef) && sameSha && activeOrDone;
                 });
+
+                let satisfiesAddedLevel = false;
+                for (const run of candidateRuns) {
+                  const title = run.display_title || run.name || '';
+                  const runMatch = title.match(/(?:CI\s+)?Level\s*(\d+)/i);
+                  let detectedLevel = runMatch? Number(runMatch[1]) : 0;
+
+                  if (detectedLevel >= addedLevel) {
+                    satisfiesAddedLevel = true;
+                    break;
+                  }
+                }
 
                 if (satisfiesAddedLevel) {
                   requiresDispatch = false;
