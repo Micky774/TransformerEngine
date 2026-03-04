@@ -64,7 +64,7 @@ jobs:
                 const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
                   owner,
                   repo,
-                  workflow_id: 'rocm-ci.yml',
+                  workflow_id: 'rocm-ci-dispatch.yml',
                   per_page: 100,
                 });
 
@@ -88,12 +88,26 @@ jobs:
 
                 let satisfiesAddedLevel = false;
                 for (const run of candidateRuns) {
-                  const title = run.display_title || run.name || '';
-                  const runMatch = title.match(/(?:CI\s+)?Level\s*(\d+)/i);
-                  let detectedLevel = runMatch? Number(runMatch[1]) : 0;
+                  let detectedLevel = 0;
+
+                  // Inspect called-workflow job names, which include level.
+                  const jobsResp = await github.rest.actions.listJobsForWorkflowRun({
+                    owner,
+                    repo,
+                    run_id: run.id,
+                    per_page: 100,
+                  });
+
+                  for (const job of jobsResp.data.jobs || []) {
+                    const m = (job.name || '').match(/(?:CI\s+)?Level\s*(\d+)/i);
+                    if (m) {
+                      detectedLevel = Math.max(detectedLevel, Number(m[1]));
+                    }
+                    core.info(`Dispatch debug: run_id=${run.id}, job_id=${job.id}, job_name=${job.name}, detectedLevel=${detectedLevel}`);
+                  }
 
                   core.info(
-                    `Dispatch debug: run_id=${run.id}, status=${run.status}, head_branch=${run.head_branch}, title='${title}', detectedLevel=${detectedLevel}, threshold=${addedLevel}`
+                    `Dispatch debug: run_id=${run.id}, status=${run.status}, head_branch=${run.head_branch}, detectedLevel=${detectedLevel}, threshold=${addedLevel}`
                   );
 
                   if (detectedLevel >= addedLevel) {
