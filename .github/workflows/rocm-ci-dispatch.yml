@@ -64,7 +64,7 @@ jobs:
                 const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
                   owner,
                   repo,
-                  workflow_id: 'rocm-ci-dispatch.yml',
+                  workflow_id: 'rocm-ci.yml',
                   per_page: 100,
                 });
 
