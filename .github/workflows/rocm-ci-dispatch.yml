@@ -11,10 +11,6 @@ on:
       - 'release_v2.*_rocm'
     types: [ labeled, unlabeled, synchronize, reopened ]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
   actions: read
