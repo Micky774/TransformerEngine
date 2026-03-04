@@ -39,9 +39,8 @@ jobs:
             const action = context.payload.action;
             const currentLevel = labels.length ? Math.max(...labels) : 0;
 
-            // Determine if a CI level label was removed or added, and what level it was.
+            // Determine if a CI level label was added, and what level it was.
             const addedLevel = action === 'labeled' ? parseLevelLabel(context.payload.label?.name) : 0;
-            const removedLevel = action === 'unlabeled' ? parseLevelLabel(context.payload.label?.name) : 0;
 
             let requiresDispatch = false;
             if (action === 'labeled') {
@@ -68,7 +67,13 @@ jobs:
                   const prMatch = (run.pull_requests || []).some(pr => pr.number === prNumber);
                   const sameSha = run.head_sha === headSha;
                   const sameHeadRef = run.head_branch === context.payload.pull_request.head.ref;
-                  const activeOrDone = run.status === 'queued' || run.status === 'in_progress' || run.status === 'completed';
+                  const activeOrDone =
+                    run.status === 'queued' ||
+                    run.status === 'in_progress' ||
+                    run.status === 'requested' ||
+                    run.status === 'waiting' ||
+                    run.status === 'pending' ||
+                    run.status === 'completed';
                   return (prMatch || sameHeadRef) && sameSha && activeOrDone;
                 });
 
