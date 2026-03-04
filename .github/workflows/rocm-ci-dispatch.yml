@@ -128,11 +128,11 @@ jobs:
             core.info(`Dispatch debug: final requiresDispatch=${requiresDispatch}, output test_level=${requiresDispatch ? String(currentLevel) : ''}`);
             core.setOutput('test_level', requiresDispatch ? String(currentLevel) : '');
 
-  cancel_all_on_last_label_removed:
+  maybe_cancel_all:
     if: ${{ github.event.action == 'unlabeled' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Cancel all active CI test runs for this PR
+      - name: Cancel all active CI test runs for this PR if there are no remaining CI-level labels
         uses: actions/github-script@v7
         with:
           script: |
