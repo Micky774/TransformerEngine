@@ -48,10 +48,39 @@ jobs:
               // Only dispatch when the added CI-level label is now the highest level.
               // Adding a lower-level label should not trigger a new run.
               requiresDispatch = addedLevel > 0 && addedLevel === currentLevel;
+
+              // If an existing run for this PR/commit already satisfies the newly
+              // added level (same or higher), reuse it and do not dispatch again.
+              if (requiresDispatch) {
+                const prNumber = context.payload.pull_request.number;
+                const headSha = context.payload.pull_request.head.sha;
+                const owner = context.repo.owner;
+                const repo = context.repo.repo;
+
+                const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+                  owner,
+                  repo,
+                  workflow_id: 'rocm-ci-dispatch.yml',
+                  event: 'pull_request',
+                  per_page: 100,
+                });
+
+                const satisfiesAddedLevel = runs.some(run => {
+                  const prMatch = (run.pull_requests || []).some(pr => pr.number === prNumber);
+                  const sameSha = run.head_sha === headSha;
+                  const activeOrDone = run.status === 'queued' || run.status === 'in_progress' || run.status === 'completed';
+                  const title = run.display_title || '';
+                  const match = title.match(/CI Level (\d+)/i);
+                  const runLevel = match ? Number(match[1]) : 0;
+                  return prMatch && sameSha && activeOrDone && runLevel >= addedLevel;
+                });
+
+                if (satisfiesAddedLevel) {
+                  requiresDispatch = false;
+                }
+              }
             } else if (action === 'unlabeled') {
               // Do not dispatch on label removal.
-              // In particular, removing a higher-level label should not trigger
-              // a new lower-level run.
               requiresDispatch = false;
             } else if (action === 'synchronize' || action === 'reopened') {
               requiresDispatch = currentLevel > 0;
