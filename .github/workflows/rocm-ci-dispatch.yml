@@ -60,19 +60,19 @@ jobs:
                 const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
                   owner,
                   repo,
-                  workflow_id: 'rocm-ci-dispatch.yml',
-                  event: 'pull_request',
+                  workflow_id: 'rocm-ci.yml',
                   per_page: 100,
                 });
 
                 const satisfiesAddedLevel = runs.some(run => {
                   const prMatch = (run.pull_requests || []).some(pr => pr.number === prNumber);
                   const sameSha = run.head_sha === headSha;
+                  const sameHeadRef = run.head_branch === context.payload.pull_request.head.ref;
                   const activeOrDone = run.status === 'queued' || run.status === 'in_progress' || run.status === 'completed';
-                  const title = run.display_title || '';
+                  const title = run.display_title || run.name || '';
                   const match = title.match(/CI Level (\d+)/i);
                   const runLevel = match ? Number(match[1]) : 0;
-                  return prMatch && sameSha && activeOrDone && runLevel >= addedLevel;
+                  return (prMatch || sameHeadRef) && sameSha && activeOrDone && runLevel >= addedLevel;
                 });
 
                 if (satisfiesAddedLevel) {
