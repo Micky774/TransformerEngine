@@ -42,11 +42,14 @@ jobs:
             // Determine if a CI level label was added, and what level it was.
             const addedLevel = action === 'labeled' ? parseLevelLabel(context.payload.label?.name) : 0;
 
+            core.info(`Dispatch debug: action=${action}, addedLabel=${context.payload.label?.name || ''}, addedLevel=${addedLevel}, currentLevel=${currentLevel}, labels=[${labels.join(',')}]`);
+
             let requiresDispatch = false;
             if (action === 'labeled') {
               // Only dispatch when the added CI-level label is now the highest level.
               // Adding a lower-level label should not trigger a new run.
               requiresDispatch = addedLevel > 0 && addedLevel === currentLevel;
+              core.info(`Dispatch debug: initial labeled decision requiresDispatch=${requiresDispatch}`);
 
               // If an existing run for this PR/commit already satisfies the newly
               // added level (same or higher), reuse it and do not dispatch again.
@@ -56,12 +59,16 @@ jobs:
                 const owner = context.repo.owner;
                 const repo = context.repo.repo;
 
+                core.info(`Dispatch debug: checking existing runs for PR #${prNumber}, headSha=${headSha}`);
+
                 const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
                   owner,
                   repo,
                   workflow_id: 'rocm-ci-dispatch.yml',
                   per_page: 100,
                 });
+
+                core.info(`Dispatch debug: total workflow runs fetched=${runs.length}`);
 
                 const candidateRuns = runs.filter(run => {
                   const prMatch = (run.pull_requests || []).some(pr => pr.number === prNumber);
@@ -77,14 +84,21 @@ jobs:
                   return (prMatch || sameHeadRef) && sameSha && activeOrDone;
                 });
 
+                core.info(`Dispatch debug: candidate runs matching PR/ref+sha=${candidateRuns.length}`);
+
                 let satisfiesAddedLevel = false;
                 for (const run of candidateRuns) {
                   const title = run.display_title || run.name || '';
                   const runMatch = title.match(/(?:CI\s+)?Level\s*(\d+)/i);
                   let detectedLevel = runMatch? Number(runMatch[1]) : 0;
 
+                  core.info(
+                    `Dispatch debug: run_id=${run.id}, status=${run.status}, head_branch=${run.head_branch}, title='${title}', detectedLevel=${detectedLevel}, threshold=${addedLevel}`
+                  );
+
                   if (detectedLevel >= addedLevel) {
                     satisfiesAddedLevel = true;
+                    core.info(`Dispatch debug: run_id=${run.id} satisfies added level; skipping new dispatch`);
                     break;
                   }
                 }
@@ -92,6 +106,7 @@ jobs:
                 if (satisfiesAddedLevel) {
                   requiresDispatch = false;
                 }
+                core.info(`Dispatch debug: post-existing-run check requiresDispatch=${requiresDispatch}`);
               }
             } else if (action === 'unlabeled') {
               // Do not dispatch on label removal.
@@ -99,6 +114,7 @@ jobs:
             } else if (action === 'synchronize' || action === 'reopened') {
               requiresDispatch = currentLevel > 0;
             }
+            core.info(`Dispatch debug: final requiresDispatch=${requiresDispatch}, output test_level=${requiresDispatch ? String(currentLevel) : ''}`);
             core.setOutput('test_level', requiresDispatch ? String(currentLevel) : '');
 
   dispatch:
