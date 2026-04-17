@@ -108,7 +108,9 @@ jobs:
       - name: Dispatch worker
         if: steps.resolve.outputs.action != ''
         env:
-          GH_TOKEN: ${{ github.token }}
+          # repository_dispatch requires a PAT (or GitHub App token) — the
+          # default GITHUB_TOKEN returns 403 here by design (recursion guard).
+          GH_TOKEN: ${{ secrets.WORKFLOW_DISPATCH_TOKEN }}
         run: |
           gh api repos/${{ github.repository }}/dispatches \
             -f event_type=claude-pr-action \
